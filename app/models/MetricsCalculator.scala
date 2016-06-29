@@ -2,6 +2,7 @@ package models
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 import play.api.libs.ws._
 import play.api.libs.json._
 
@@ -37,9 +38,27 @@ object metrics_calculator {
     })
   }
 
+  def parseResult(result: WSResponse): Try[List[ResourceWrapper]] = {
+    val resourcesResult = for {
+      json <- (result.json \ "list" \ "resources").toEither.right
+      resources <- Json.fromJson[List[ResourceWrapper]](json).asEither.right
+    } yield resources
+
+    Try {
+      resourcesResult match {
+        case Left(_) => throw new Exception("remote api call failed")
+        case Right(resources) => resources
+      }
+    }
+  }
+
+  def makeQueryUrl(stocks: MyNel[StockSign]): String = {
+    s"http://finance.yahoo.com/webservice/v1/symbols/${stocks.toList.mkString(",")}/quote"
+  }
+
   def fetchRawData(stocks: MyNel[StockSign])(ws: WSClient): Future[List[ResourceWrapper]] = {
     val request =
-     ws.url(s"http://finance.yahoo.com/webservice/v1/symbols/${stocks.toList.mkString(",")}/quote")
+     ws.url(makeQueryUrl(stocks))
        .withQueryString(
          "format" -> "json",
          "view" -> "detail"
@@ -48,15 +67,7 @@ object metrics_calculator {
     val response = request.get()
 
     response.flatMap(result => {
-      val resourcesResult = for {
-         json <- (result.json \ "list" \ "resources").toEither.right
-         resources <- Json.fromJson[List[ResourceWrapper]](json).asEither.right
-      } yield resources
-
-      resourcesResult match {
-        case Left(_) => Future.failed(new Exception("remote api call failed"))
-        case Right(resources) => Future.successful(resources)
-      }
+      Future.fromTry(parseResult(result))
     })
   }
 }
