@@ -1,0 +1,40 @@
+@import models.metrics_calculator._
+@import models.api_dto._
+@(metricsResults: List[models.metrics_calculator.MetricsResult])
+
+@stockTable(values: List[ResourceWrapper]) = {
+        <table>
+            <thead>
+                <tr>
+                    <th>Sign</th>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Change</th>
+                </tr>
+            </thead>
+            <tbody>
+            @for(stock <- values) {
+            @defining(stock.resource.fields) { data =>
+            <tr>
+                <td>@data.symbol</td>
+                <td>@data.name</td>
+                <td>@data.price</td>
+                <td>@data.change</td>
+            </tr>
+            }
+            }
+            </tbody>
+        </table>
+}
+
+<h1>Results</h1>
+
+@for(result <- metricsResults) {
+    @result match {
+        case ResourcesList(values) => {
+            @stockTable(values)
+        }
+        case ResourcesMap(values) => { <strong>Not implemented yet</strong> }
+
+    }
+}
